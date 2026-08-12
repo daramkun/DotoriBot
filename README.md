@@ -4,6 +4,7 @@
 
 - `/tts` 또는 `/말`: 사용자가 들어가 있는 음성 채널에서 Supertonic 3로 텍스트를 읽습니다.
 - `/leave` 또는 `/퇴장`: 재생 중인 음성과 대기열을 중단하고 음성 채널에서 나갑니다.
+- `/voice` 또는 `/목소리`: `M1`-`M5`, `F1`-`F5` 중 내 TTS 목소리를 선택합니다. 선택은 재시작 후에도 유지됩니다.
 - 이모지만 하나 보낸 메시지: 원본을 지우고, 같은 표시 이름과 프로필 사진을 사용하는 웹훅으로 큰 이미지 파일을 다시 올립니다. Discord 커스텀 이모지(움직이는 이모지 포함)와 유니코드 이모지를 지원합니다.
 
 Supertonic 3 추론은 봇이 실행되는 컴퓨터에서 로컬로 이루어집니다. 최초 실행 시 모델 약 400MB를 Hugging Face 캐시에 내려받습니다.
@@ -38,7 +39,7 @@ python -m dotori_bot.bot
 
 기본 음성은 `F1`, 언어는 한국어(`ko`)입니다. `.env`에서 `TTS_VOICE`, `TTS_LANGUAGE`, `TTS_SPEED`, `TTS_STEPS`를 바꿀 수 있습니다. 내장 음성은 `M1`-`M5`, `F1`-`F5`입니다.
 
-여러 요청은 서버별 재생 대기열에 순서대로 들어갑니다. 마지막 재생 뒤 `VOICE_IDLE_SECONDS`가 지나면 봇이 음성 채널에서 자동으로 나갑니다.
+여러 요청은 서버별 재생 대기열에 순서대로 들어갑니다. 봇이 들어가 있는 음성 채널에서 일반 사용자가 모두 나가면 재생과 대기열을 정리하고 즉시 자동으로 나갑니다. 다른 봇만 남아 있는 경우에도 사람이 없는 것으로 처리합니다.
 
 ## Docker
 
@@ -47,13 +48,15 @@ Dockerfile은 Python 패키지를 설치하는 `setup` 단계와 최소 실행 �
 ```powershell
 docker build --target runtime -t dotoribot .
 docker volume create dotoribot-cache
+docker volume create dotoribot-data
 docker run --detach --name dotoribot --restart unless-stopped `
   --env-file .env `
   --mount source=dotoribot-cache,target=/home/dotoribot/.cache `
+  --mount source=dotoribot-data,target=/home/dotoribot/.data `
   dotoribot
 ```
 
-캐시 볼륨에는 최초 실행 시 내려받는 Supertonic 3 모델이 보존됩니다. 볼륨을 연결하지 않아도 실행은 가능하지만 컨테이너를 새로 만들 때 모델을 다시 다운로드하게 됩니다.
+캐시 볼륨에는 최초 실행 시 내려받는 Supertonic 3 모델이 보존되고, 데이터 볼륨에는 사용자별 목소리 설정이 저장됩니다.
 
 ## 참고 사항
 

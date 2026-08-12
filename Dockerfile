@@ -27,7 +27,8 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     VIRTUAL_ENV=/opt/venv \
     PATH="/opt/venv/bin:$PATH" \
-    XDG_CACHE_HOME=/home/dotoribot/.cache
+    XDG_CACHE_HOME=/home/dotoribot/.cache \
+    VOICE_SETTINGS_PATH=/home/dotoribot/.data/voice_preferences.json
 
 RUN apt-get update \
     && apt-get install --no-install-recommends -y \
@@ -37,7 +38,7 @@ RUN apt-get update \
         libsndfile1 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 --shell /usr/sbin/nologin dotoribot \
-    && mkdir -p /home/dotoribot/.cache \
+    && mkdir -p /home/dotoribot/.cache /home/dotoribot/.data \
     && chown -R dotoribot:dotoribot /home/dotoribot
 
 COPY --from=setup /opt/venv /opt/venv
@@ -47,6 +48,6 @@ WORKDIR /home/dotoribot
 
 # Supertonic 3 모델은 첫 TTS 요청 때 ~/.cache/supertonic3에 다운로드된다.
 # 캐시 유지를 위해 실행 시 /home/dotoribot/.cache를 볼륨으로 마운트하는 것을 권장한다.
-VOLUME ["/home/dotoribot/.cache"]
+VOLUME ["/home/dotoribot/.cache", "/home/dotoribot/.data"]
 
 ENTRYPOINT ["python", "-m", "dotori_bot.bot"]

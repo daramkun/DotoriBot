@@ -8,9 +8,15 @@ from discord import app_commands
 from .config import Settings
 from .emoji_reposter import EmojiReposter
 from .tts import AudioJob, SupertonicService, VoiceQueueManager
+from .voice_preferences import VoicePreferenceStore
 
 
 LOGGER = logging.getLogger("dotoribot")
+
+
+def channel_has_humans(channel: discord.abc.Connectable) -> bool:
+    members = getattr(channel, "members", ())
+    return any(not member.bot for member in members)
 
 
 class DotoriBot(discord.Client):
@@ -26,7 +32,10 @@ class DotoriBot(discord.Client):
             speed=settings.tts_speed,
             steps=settings.tts_steps,
         )
-        self.voice_queues = VoiceQueueManager(settings.voice_idle_seconds)
+        self.voice_queues = VoiceQueueManager()
+        self.voice_preferences = VoicePreferenceStore(
+            settings.voice_settings_path, settings.tts_voice
+        )
         self.emoji_reposter = EmojiReposter(self, settings.emoji_webhook_name)
 
     async def setup_hook(self) -> None:
@@ -34,6 +43,8 @@ class DotoriBot(discord.Client):
         self.tree.add_command(speak_korean_command)
         self.tree.add_command(leave_command)
         self.tree.add_command(leave_korean_command)
+        self.tree.add_command(voice_command)
+        self.tree.add_command(voice_korean_command)
         if self.settings.dev_guild_id:
             guild = discord.Object(id=self.settings.dev_guild_id)
             self.tree.copy_global_to(guild=guild)
@@ -53,6 +64,25 @@ class DotoriBot(discord.Client):
             LOGGER.warning("메시지 %s 처리 권한이 없습니다.", message.id)
         except discord.HTTPException:
             LOGGER.exception("메시지 %s의 이모지 재게시 중 오류가 발생했습니다.", message.id)
+
+    async def on_voice_state_update(
+        self,
+        member: discord.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState,
+    ) -> None:
+        voice_client = member.guild.voice_client
+        if voice_client is None or not voice_client.is_connected():
+            return
+        channel = voice_client.channel
+        if channel is None or channel_has_humans(channel):
+            return
+
+        LOGGER.info("서버 %s의 음성 채널에 사람이 없어 자동 퇴장합니다.", member.guild.id)
+        try:
+            await self.voice_queues.stop(member.guild.id, voice_client)
+        except Exception:
+            LOGGER.exception("빈 음성 채널에서 자동 퇴장하지 못했습니다.")
 
 
 async def _handle_tts(interaction: discord.Interaction, text: str) -> None:
@@ -88,9 +118,19 @@ async def _handle_tts(interaction: discord.Interaction, text: str) -> None:
                 return
             await voice_client.move_to(channel)
 
-        pcm = await bot.tts.synthesize(text.strip())
+        voice = bot.voice_preferences.get(interaction.user.id)
+        pcm = await bot.tts.synthesize(text.strip(), voice=voice)
+        if not voice_client.is_connected() or not channel_has_humans(channel):
+            await interaction.edit_original_response(
+                content="음성을 만드는 동안 채널에 사람이 없어 자동으로 나왔어요."
+            )
+            return
         ahead = bot.voice_queues.enqueue(voice_client, AudioJob(pcm=pcm))
-        status = "바로 읽을게요." if ahead == 0 else f"대기열에 추가했어요. 앞에 {ahead}개가 있어요."
+        status = (
+            f"{voice} 목소리로 바로 읽을게요."
+            if ahead == 0
+            else f"{voice} 목소리로 대기열에 추가했어요. 앞에 {ahead}개가 있어요."
+        )
         await interaction.edit_original_response(content=status)
     except discord.Forbidden:
         await interaction.edit_original_response(content="음성 채널에 연결하거나 말할 권한이 없어요.")
@@ -130,6 +170,22 @@ async def _handle_leave(interaction: discord.Interaction) -> None:
         await interaction.edit_original_response(content="음성 채널에서 나오는 중 오류가 발생했어요.")
 
 
+async def _handle_voice(interaction: discord.Interaction, voice: str) -> None:
+    bot = interaction.client
+    if not isinstance(bot, DotoriBot):
+        return
+    try:
+        await bot.voice_preferences.set(interaction.user.id, voice)
+        await interaction.response.send_message(
+            f"앞으로 TTS에 **{voice}** 목소리를 사용할게요.", ephemeral=True
+        )
+    except (OSError, ValueError):
+        LOGGER.exception("사용자 %s의 목소리 설정 저장에 실패했습니다.", interaction.user.id)
+        await interaction.response.send_message(
+            "목소리 설정을 저장하지 못했어요. 서버 로그를 확인해 주세요.", ephemeral=True
+        )
+
+
 @app_commands.command(name="tts", description="Supertonic 3로 글을 읽어 줍니다")
 @app_commands.describe(text="읽을 내용")
 async def tts_command(interaction: discord.Interaction, text: str) -> None:
@@ -150,6 +206,33 @@ async def leave_command(interaction: discord.Interaction) -> None:
 @app_commands.command(name="퇴장", description="재생을 중단하고 음성 채널에서 나갑니다")
 async def leave_korean_command(interaction: discord.Interaction) -> None:
     await _handle_leave(interaction)
+
+
+VOICE_CHOICES = [
+    app_commands.Choice(name=f"남성 {number} (M{number})", value=f"M{number}")
+    for number in range(1, 6)
+] + [
+    app_commands.Choice(name=f"여성 {number} (F{number})", value=f"F{number}")
+    for number in range(1, 6)
+]
+
+
+@app_commands.command(name="voice", description="내 TTS 목소리를 설정합니다")
+@app_commands.describe(voice="사용할 Supertonic 3 목소리")
+@app_commands.choices(voice=VOICE_CHOICES)
+async def voice_command(
+    interaction: discord.Interaction, voice: app_commands.Choice[str]
+) -> None:
+    await _handle_voice(interaction, voice.value)
+
+
+@app_commands.command(name="목소리", description="내 TTS 목소리를 설정합니다")
+@app_commands.describe(목소리="사용할 Supertonic 3 목소리")
+@app_commands.choices(목소리=VOICE_CHOICES)
+async def voice_korean_command(
+    interaction: discord.Interaction, 목소리: app_commands.Choice[str]
+) -> None:
+    await _handle_voice(interaction, 목소리.value)
 
 
 def main() -> None:

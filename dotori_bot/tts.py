@@ -59,29 +59,32 @@ class SupertonicService:
         self.speed = speed
         self.steps = steps
         self._tts: Any = None
-        self._style: Any = None
+        self._styles: dict[str, Any] = {}
         self._lock = asyncio.Lock()
 
-    def _synthesize_sync(self, text: str) -> bytes:
+    def _synthesize_sync(self, text: str, voice: str) -> bytes:
         if self._tts is None:
             from supertonic import TTS
 
             self._tts = TTS(auto_download=True)
-            self._style = self._tts.get_voice_style(voice_name=self.voice)
+        style = self._styles.get(voice)
+        if style is None:
+            style = self._tts.get_voice_style(voice_name=voice)
+            self._styles[voice] = style
 
         wav, _duration = self._tts.synthesize(
             text=text,
-            voice_style=self._style,
+            voice_style=style,
             lang=self.language,
             total_steps=self.steps,
             speed=self.speed,
         )
         return float_audio_to_discord_pcm(wav, int(self._tts.sample_rate))
 
-    async def synthesize(self, text: str) -> bytes:
+    async def synthesize(self, text: str, voice: str | None = None) -> bytes:
         # ONNX 세션과 음성 스타일은 공유하되 동시 접근은 직렬화한다.
         async with self._lock:
-            return await asyncio.to_thread(self._synthesize_sync, text)
+            return await asyncio.to_thread(self._synthesize_sync, text, voice or self.voice)
 
 
 @dataclass(slots=True)
@@ -90,8 +93,7 @@ class AudioJob:
 
 
 class VoiceQueueManager:
-    def __init__(self, idle_seconds: int) -> None:
-        self.idle_seconds = idle_seconds
+    def __init__(self) -> None:
         self._queues: dict[int, asyncio.Queue[AudioJob]] = {}
         self._workers: dict[int, asyncio.Task[None]] = {}
 
@@ -124,12 +126,7 @@ class VoiceQueueManager:
         queue = self._queues[guild_id]
         try:
             while True:
-                try:
-                    job = await asyncio.wait_for(queue.get(), timeout=self.idle_seconds)
-                except asyncio.TimeoutError:
-                    if voice_client.is_connected():
-                        await voice_client.disconnect()
-                    return
+                job = await queue.get()
 
                 try:
                     if not voice_client.is_connected():

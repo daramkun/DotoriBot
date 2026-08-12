@@ -20,7 +20,7 @@ class Settings:
     tts_speed: float
     tts_steps: int
     tts_max_chars: int
-    voice_idle_seconds: int
+    voice_settings_path: str
     emoji_webhook_name: str
 
     @classmethod
@@ -42,11 +42,13 @@ class Settings:
             raise RuntimeError("TTS_STEPS는 5 이상 12 이하여야 합니다.")
 
         max_chars = int(os.getenv("TTS_MAX_CHARS", "500"))
-        idle_seconds = int(os.getenv("VOICE_IDLE_SECONDS", "300"))
         if max_chars < 1:
             raise RuntimeError("TTS_MAX_CHARS는 1 이상이어야 합니다.")
-        if idle_seconds < 1:
-            raise RuntimeError("VOICE_IDLE_SECONDS는 1 이상이어야 합니다.")
+        voice_settings_path = os.getenv(
+            "VOICE_SETTINGS_PATH", "data/voice_preferences.json"
+        ).strip()
+        if not voice_settings_path:
+            raise RuntimeError("VOICE_SETTINGS_PATH는 비워 둘 수 없습니다.")
 
         return cls(
             discord_token=token,
@@ -56,6 +58,6 @@ class Settings:
             tts_speed=speed,
             tts_steps=steps,
             tts_max_chars=max_chars,
-            voice_idle_seconds=idle_seconds,
+            voice_settings_path=voice_settings_path,
             emoji_webhook_name=os.getenv("EMOJI_WEBHOOK_NAME", "DotoriBot Emoji").strip(),
         )
