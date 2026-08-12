@@ -1,5 +1,7 @@
 from dotori_bot.bot import (
     channel_has_humans,
+    chat_tts_start_command,
+    chat_tts_stop_command,
     leave_command,
     leave_korean_command,
     speak_korean_command,
@@ -30,6 +32,8 @@ def test_slash_command_names_and_parameters() -> None:
     assert [parameter.name for parameter in voice_command.parameters] == ["voice"]
     assert voice_korean_command.name == "목소리"
     assert [parameter.name for parameter in voice_korean_command.parameters] == ["목소리"]
+    assert chat_tts_start_command.name == "말시작"
+    assert chat_tts_stop_command.name == "말끝"
 
 
 def test_channel_human_detection() -> None:

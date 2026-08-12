@@ -51,14 +51,14 @@ class EmojiReposter:
         self._webhooks[channel.id] = webhook
         return webhook
 
-    async def handle(self, message: discord.Message) -> None:
+    async def handle(self, message: discord.Message) -> bool:
         if message.guild is None or message.author.bot or message.webhook_id is not None:
-            return
+            return False
         if message.attachments or message.stickers:
-            return
+            return False
         asset = single_emoji_asset(message.content)
         if asset is None:
-            return
+            return False
 
         thread: discord.Thread | None = None
         if isinstance(message.channel, discord.Thread):
@@ -67,7 +67,7 @@ class EmojiReposter:
         else:
             webhook_channel = message.channel
         if webhook_channel is None or not hasattr(webhook_channel, "webhooks"):
-            return
+            return False
 
         webhook = await self._webhook_for(webhook_channel)
         timeout = aiohttp.ClientTimeout(total=15)
@@ -94,3 +94,4 @@ class EmojiReposter:
             if isinstance(reposted, discord.WebhookMessage):
                 await reposted.delete()
             raise
+        return True
