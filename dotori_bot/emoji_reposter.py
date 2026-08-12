@@ -6,11 +6,9 @@ from io import BytesIO
 
 import aiohttp
 import discord
-import emoji
 
 
 CUSTOM_EMOJI_RE = re.compile(r"^<(a?):([A-Za-z0-9_]{2,32}):(\d{15,22})>$")
-TWEMOJI_URL = "https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/72x72/{codepoints}.png"
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,18 +20,14 @@ class EmojiAsset:
 def single_emoji_asset(content: str) -> EmojiAsset | None:
     candidate = content.strip()
     custom = CUSTOM_EMOJI_RE.fullmatch(candidate)
-    if custom:
-        animated, _name, emoji_id = custom.groups()
-        extension = "gif" if animated else "png"
-        return EmojiAsset(
-            url=f"https://cdn.discordapp.com/emojis/{emoji_id}.{extension}?size=256&quality=lossless",
-            filename=f"emoji.{extension}",
-        )
-
-    if not emoji.is_emoji(candidate):
+    if custom is None:
         return None
-    codepoints = "-".join(f"{ord(char):x}" for char in candidate if ord(char) != 0xFE0F)
-    return EmojiAsset(url=TWEMOJI_URL.format(codepoints=codepoints), filename="emoji.png")
+    animated, _name, emoji_id = custom.groups()
+    extension = "gif" if animated else "png"
+    return EmojiAsset(
+        url=f"https://cdn.discordapp.com/emojis/{emoji_id}.{extension}?size=256&quality=lossless",
+        filename=f"emoji.{extension}",
+    )
 
 
 class EmojiReposter:
