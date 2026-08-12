@@ -1,0 +1,31 @@
+[project]
+name = "dotoribot"
+version = "0.1.0"
+description = "Discord voice TTS and emoji image repost bot"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "aiohttp>=3.9,<4",
+    "discord.py[voice]>=2.6,<3",
+    "emoji>=2.14,<3",
+    "python-dotenv>=1.0,<2",
+    "supertonic==1.3.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+]
+
+[project.scripts]
+dotoribot = "dotori_bot.bot:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["dotori_bot*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
