@@ -1,0 +1,17 @@
+services:
+  dotoribot:
+    build:
+      context: .
+      target: runtime
+    container_name: dotoribot
+    restart: unless-stopped
+    user: "1000:1000"
+    env_file:
+      - .env
+    volumes:
+      - dotoribot-cache:/home/dotoribot/.cache
+      - dotoribot-data:/home/dotoribot/.data
+
+volumes:
+  dotoribot-cache:
+  dotoribot-data:

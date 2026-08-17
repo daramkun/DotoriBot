@@ -48,17 +48,17 @@ python -m dotori_bot.bot
 Dockerfile은 Python 패키지를 설치하는 `setup` 단계와 최소 실행 환경인 `runtime` 단계로 나뉩니다.
 
 ```powershell
-docker build --target runtime -t dotoribot .
-docker volume create dotoribot-cache
-docker volume create dotoribot-data
-docker run --detach --name dotoribot --restart unless-stopped `
-  --env-file .env `
-  --mount source=dotoribot-cache,target=/home/dotoribot/.cache `
-  --mount source=dotoribot-data,target=/home/dotoribot/.data `
-  dotoribot
+docker compose build
+docker compose up --detach
 ```
 
 캐시 볼륨에는 최초 실행 시 내려받는 Supertonic 3 모델이 보존되고, 데이터 볼륨에는 사용자별 목소리 설정이 저장됩니다.
+Compose는 컨테이너를 `1000:1000` 사용자로 실행합니다. 기존에 생성된 볼륨의 소유자가 다른 경우에는 한 번만 다음 명령으로 보정하세요.
+
+```powershell
+docker compose run --rm --user 0 --entrypoint sh dotoribot -c "chown -R 1000:1000 /home/dotoribot/.cache /home/dotoribot/.data"
+docker compose up --detach
+```
 
 ## 참고 사항
 

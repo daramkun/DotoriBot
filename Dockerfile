@@ -37,7 +37,8 @@ RUN apt-get update \
         libopus0 \
         libsndfile1 \
     && rm -rf /var/lib/apt/lists/* \
-    && useradd --create-home --uid 10001 --shell /usr/sbin/nologin dotoribot \
+    && groupadd --gid 1000 dotoribot \
+    && useradd --create-home --uid 1000 --gid 1000 --shell /usr/sbin/nologin dotoribot \
     && mkdir -p /home/dotoribot/.cache /home/dotoribot/.data \
     && chown -R dotoribot:dotoribot /home/dotoribot
 
