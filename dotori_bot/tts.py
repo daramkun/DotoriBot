@@ -121,6 +121,11 @@ class VoiceQueueManager:
         self._queues.pop(guild_id, None)
         if voice_client.is_connected():
             await voice_client.disconnect(force=True)
+        else:
+            # Discord.py keeps a disconnected VoiceClient in its internal
+            # state until cleanup() is called. Remove that stale entry so a
+            # later command can establish a fresh connection.
+            voice_client.cleanup()
 
     async def _run(self, guild_id: int, voice_client: discord.VoiceClient) -> None:
         queue = self._queues[guild_id]

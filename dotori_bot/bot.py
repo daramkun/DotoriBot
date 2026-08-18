@@ -110,6 +110,12 @@ class DotoriBot(discord.Client):
     ) -> None:
         if self.user is not None and member.id == self.user.id and after.channel is None:
             self.chat_tts_sessions.clear_guild(member.guild.id)
+            voice_client = member.guild.voice_client
+            if voice_client is not None:
+                try:
+                    await self.voice_queues.stop(member.guild.id, voice_client)
+                except Exception:
+                    LOGGER.exception("서버 %s의 끊어진 음성 연결을 정리하지 못했습니다.", member.guild.id)
             return
 
         voice_client = member.guild.voice_client
@@ -150,6 +156,10 @@ async def _handle_tts(interaction: discord.Interaction, text: str) -> None:
     await interaction.response.defer(ephemeral=True, thinking=True)
     voice_client = interaction.guild.voice_client
     try:
+        if voice_client is not None and not voice_client.is_connected():
+            await bot.voice_queues.stop(interaction.guild.id, voice_client)
+            voice_client = None
+
         if voice_client is None:
             voice_client = await channel.connect()
         elif voice_client.channel != channel:
@@ -256,6 +266,10 @@ async def _handle_chat_tts_start(interaction: discord.Interaction) -> None:
 
     await interaction.response.defer(ephemeral=True, thinking=True)
     try:
+        if voice_client is not None and not voice_client.is_connected():
+            await bot.voice_queues.stop(interaction.guild.id, voice_client)
+            voice_client = None
+
         if voice_client is None or not voice_client.is_connected():
             voice_client = await channel.connect()
     except discord.Forbidden:
